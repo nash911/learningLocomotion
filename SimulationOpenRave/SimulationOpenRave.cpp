@@ -179,7 +179,7 @@ void SimulationOpenRave::set_default_parameters(void)
     number_of_modules = 2;
     this->set_robot_priority("Robot_Primary");
     scene_file_name = "../models/Minicube-I.env.xml";
-    simu_resolution_microseconds = 0.001;
+    simu_resolution_microseconds = 0.0025;
     
     showgui = true;
 }
@@ -296,7 +296,9 @@ void SimulationOpenRave::reset_robot(void)
     //-- Initialize the controller evaluation time counter to 0;
     init_elapsed_evaluation_time();
     
-    distance_travelled = 0;
+    distance_travelled = 0.0;
+    distance_travelled_cumulative_x = 0.0;
+    distance_travelled_cumulative_y = 0.0;
 }
 
 
@@ -316,6 +318,8 @@ void SimulationOpenRave::reset_robot_position(void)
     _roll = M_PI/2.0;
     
     distance_travelled = 0;
+    distance_travelled_cumulative_x = 0.0;
+    distance_travelled_cumulative_y = 0.0;
 }
 
 void SimulationOpenRave::reset_modules(void)
@@ -611,26 +615,38 @@ void SimulationOpenRave::measure_cumulative_distance(void)
 
 double SimulationOpenRave::get_vx(void)
 {
-    Vector robot_pos_current = probot->GetCenterOfMass();  //-- TODO: To be changed to get_robot_XY();
+    Vector robot_pos_current = probot->GetCenterOfMass();
 
+    //--Note: Roll and Yaw are interchanged from the robot's FoV--//
     double cosT = cos(_roll);
     double sinT = sin(_roll);
 
+    //--t ∈ |R²--//
     vec t(2);
+
+    //--t = [x,y]'--//
     t(0) = robot_pos_previous.x;
     t(1) = robot_pos_previous.y;
 
+    //--R ∈ |R²x²--//
     mat R(2,2);
+
+    //--|‾ cosΘ sinΘ ‾|--//
+    //--|_-sinΘ cosΘ _|--//
     R(0,0) = cosT;
     R(0,1) = -sinT;
 
     R(1,0) = sinT;
     R(1,1) = cosT;
 
+    //--t = -R'*t--//
     t = -R.t() * t;
 
-    //mat X_inv(3,3);
+    //--X⁻¹ ∈ |R³x³--//
     mat X_inv = eye<mat>(3,3);
+
+    //--|‾ R' -R't ‾|--//
+    //--|_ 0    1  _|--//
     X_inv(0,0) = cosT;
     X_inv(0,1) = sinT;
     X_inv(0,2) = t(0);
@@ -639,16 +655,23 @@ double SimulationOpenRave::get_vx(void)
     X_inv(1,1) = cosT;
     X_inv(1,2) = t(1);
 
+    //--P_global ∈ |R³--//
     vec P_glo(3);
     P_glo(0) = robot_pos_current.x;
     P_glo(1) = robot_pos_current.y;
     P_glo(2) = 1.0;
 
+    //--P_local ∈ |R³--//
     vec P_loc;
+
+    //--P_local = X⁻¹ * P_global--//
     P_loc = X_inv * P_glo;
 
+    double dx = P_loc(0);
     double dt = (elapsed_evaluation_time - previous_velocity_time) / 1000000.0;
-    double vx = P_loc(0)/dt;
+    double vx = dx/dt;
+
+    distance_travelled_cumulative_x = distance_travelled_cumulative_x + dx;
 
     //--TODO: To be removed--//
     Vector distance3D = robot_pos_current - robot_pos_previous;
@@ -687,6 +710,93 @@ double SimulationOpenRave::get_vx(void)
 }
 
 
+double SimulationOpenRave::get_vy(void)
+{
+    Vector robot_pos_current = probot->GetCenterOfMass();
+
+    //--Note: Roll and Yaw are interchanged from the robot's FoV--//
+    double cosT = cos(_roll);
+    double sinT = sin(_roll);
+
+    //--t ∈ |R²--//
+    vec t(2);
+
+    //--t = [x,y]'--//
+    t(0) = robot_pos_previous.x;
+    t(1) = robot_pos_previous.y;
+
+    //--R ∈ |R²x²--//
+    mat R(2,2);
+
+    //--|‾ cosΘ sinΘ ‾|--//
+    //--|_-sinΘ cosΘ _|--//
+    R(0,0) = cosT;
+    R(0,1) = -sinT;
+
+    R(1,0) = sinT;
+    R(1,1) = cosT;
+
+    //--t = -R'*t--//
+    t = -R.t() * t;
+
+    //--X⁻¹ ∈ |R³x³--//
+    mat X_inv = eye<mat>(3,3);
+
+    //--|‾ R' -R't ‾|--//
+    //--|_ 0    1  _|--//
+    X_inv(0,0) = cosT;
+    X_inv(0,1) = sinT;
+    X_inv(0,2) = t(0);
+
+    X_inv(1,0) = -sinT;
+    X_inv(1,1) = cosT;
+    X_inv(1,2) = t(1);
+
+    //--P_global ∈ |R³--//
+    vec P_glo(3);
+    P_glo(0) = robot_pos_current.x;
+    P_glo(1) = robot_pos_current.y;
+    P_glo(2) = 1.0;
+
+    //--P_local ∈ |R³--//
+    vec P_loc;
+
+    //--P_local = X⁻¹ * P_global--//
+    P_loc = X_inv * P_glo;
+
+    double dy = P_loc(1);
+    double dt = (elapsed_evaluation_time - previous_velocity_time) / 1000000.0;
+    double vy = dy/dt;
+
+    distance_travelled_cumulative_y = distance_travelled_cumulative_y + dy;
+
+    //--TODO: To be removed--//
+    /*Vector distance3D = robot_pos_current - robot_pos_previous;
+    double velocity_y = distance3D.y/dt;*/
+
+    previous_velocity_time = elapsed_evaluation_time;
+    robot_pos_previous = robot_pos_current;
+
+    Transform tn;
+    tn = probot->GetTransform();
+
+    double q0 = tn.rot.w;
+    double q1 = tn.rot.x;
+    double q2 = tn.rot.y;
+    double q3 = tn.rot.z;
+
+    _roll = atan2(2*((q0*q1) + (q2*q3)) , 1 - (2 * (pow(q1,2) + pow(q2,2))));
+
+    if(_roll < 0.0)
+    {
+        _roll = (2.0 * M_PI) + _roll;
+    }
+    _roll = (1.5 * M_PI) - _roll;
+
+    return(vy);
+}
+
+
 void SimulationOpenRave::get_robot_rotation(vector<double>& rot)
 {
     Vector robot_pos_current;
@@ -715,6 +825,7 @@ void SimulationOpenRave::get_robot_rotation(vector<double>& rot)
     }
     roll = (1.5 * M_PI) - roll;
     
+    //--Note: Roll and Yaw are interchanged from the robot's FoV--//
     rot[0] = roll * (180.0/M_PI);
     rot[1] = pitch * (180.0/M_PI);
     rot[2] = yaw * (180.0/M_PI);

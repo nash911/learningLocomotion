@@ -30,9 +30,9 @@
 //#define ROBOT_Y1
 
 #ifdef ROBOT_OPENRAVE
-    #define AVERAGE_BROADCAST_PERIOD 0.0025
+#define AVERAGE_BROADCAST_PERIOD 0.0025
 #else
-    #define AVERAGE_BROADCAST_PERIOD 0.01
+#define AVERAGE_BROADCAST_PERIOD 0.01
 #endif
 
 //#define CUMUALATIVE_DISTANCE
@@ -56,6 +56,8 @@ int main(int argc, char* argv[])
     double state_max = 75.0;
     double state_res = 15.0;
 
+    unsigned int W_size = 6;
+
     char* filename;
 
     Robot *robot = NULL;
@@ -63,22 +65,22 @@ int main(int argc, char* argv[])
     SimulationOpenRave simuOR_robot;
     Y1ModularRobot y1_robot;
 
-  #ifdef ROBOT_OPENRAVE
+#ifdef ROBOT_OPENRAVE
     robot = &simuOR_robot;
-  #elif defined(ROBOT_Y1)
+#elif defined(ROBOT_Y1)
     y1_robot.set_serial_port(argv[1], BAUD_RATE);
     robot = &y1_robot;
-  #else
+#else
     std::cerr << "MorphoMotion Error: Learn." << std::endl
               << "int main(int, char*) method." << std::endl
               << "Robot Environment needs to be defined!. " << std::endl;
     exit(1);
-  #endif
+#endif
 
 
     LearningAlgorithm *l = NULL;
     l = new QLearning(robot, actions, state_min, state_max, state_res, ALPHA, GAMA, EPSILON);
-    //l = new ApproximateQLearning(robot, actions, state_min, state_max, state_res, ALPHA, GAMA, EPSILON, 5);
+    //l = new ApproximateQLearning(robot, actions, state_min, state_max, state_res, ALPHA, GAMA, EPSILON, W_size);
 
 #ifdef ROBOT_OPENRAVE
     simuOR_robot.init_simu_env("Dummy");
@@ -94,29 +96,56 @@ int main(int argc, char* argv[])
 
     cout << endl << "argc: " << argc << endl;
 
-    if(argc == 2)
+    if(argc == 3)
     {
-        filename = argv[1];
-        l->init_q_val(filename);
+        if(argv[2][0] == '-'  && (argv[2][1] == 'c' || argv[2][1] == 'e'))
+        {
+            filename = "Q_Pi.dat";
+            l->init_q_val(filename);
 
-        filename = "V.dat";
-        l->init_v_val(filename);
+            filename = "V.dat";
+            l->init_v_val(filename);
 
-        filename = "R.dat";
-        l->init_steps(filename);
+            filename = "R.dat";
+            l->init_steps(filename);
+        }
+        else if(argv[2][0] == '-' && argv[2][1] == 'l')
+        {
+            l->initialise_Q(Q_INIT_VAL);
+            l->initialise_V(V_INIT_VAL);
+        }
+        else
+        {
+            std::cerr << "LearningLocomotion Error: Learn." << std::endl
+                      << "int main(int, char*) method." << std::endl
+                      << "Invalid command line parameters" << std::endl
+                      << "Usage: ./Learn -[Robot Type (m/t/q/y/l)] -[Mode (l/c/e)]" << std::endl;
+            exit(1);
+        }
     }
     else
     {
-        l->initialise_Q(Q_INIT_VAL);
-        l->initialise_V(V_INIT_VAL);
+        std::cerr << "LearningLocomotion Error: Learn." << std::endl
+                  << "int main(int, char*) method." << std::endl
+                  << "Incurrent number of command line parameters. " << std::endl
+                  << "Usage: ./Learn -[Robot Type (m/t/q/y/l)] -[Mode (l/c/e)]" << std::endl;
+        exit(1);
     }
 
     char keyboard_key;
     std::cout << std::endl << "Press a key to start" << std::endl;
     std::cin.get(keyboard_key);
 
-    //-- Start Learning--//
-    l->start_learning("Epsilon_Greedy");
+    if(argv[2][0] == '-'  && (argv[2][1] == 'l' || argv[2][1] == 'c'))
+    {
+        //-- Start (-l) or Continue (-c) Learning--//
+        l->start_learning("Epsilon_Greedy");
+    }
+    else if(argv[2][0] == '-'  && argv[2][1] == 'e')
+    {
+        //-- Evaluate (-e)--//
+        l->start_evaluation();
+    }
 
     //char keyboard_key;
     std::cout << std::endl << "Press a key to end" << std::endl;

@@ -46,6 +46,7 @@ public:
   vec get_features(const unsigned int, const unsigned int) const;
   double get_Q_prediction(const unsigned int, const unsigned int) const;
 
+  unsigned int choose_action_greedy(const unsigned int) const;
   unsigned int choose_action_epsilon_greedy(const unsigned int, const double) const;
   unsigned int choose_action_epsilon_soft(const unsigned int, const double) const;
   unsigned int choose_action_epsilon_greedy_ExpFunc(const unsigned int, const double) const;
@@ -55,18 +56,17 @@ public:
   double N(const unsigned int, const unsigned int) const;
 
 
-  //void J() const;
-
-
   //-- VIRTUAL FUNCTIONS
   virtual void set_default(void);
   virtual void init_controller(const double);
   virtual void start_learning(const string);
   virtual void learn(const string);
+  virtual void start_evaluation();
+  virtual void evaluate(const double);
 
 private:
-  vec W;
-  //vec features;
+  mat W;
+
 };
 
 #endif

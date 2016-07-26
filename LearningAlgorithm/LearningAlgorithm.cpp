@@ -79,6 +79,7 @@ LearningAlgorithm::LearningAlgorithm(Robot* pointer_robot_primary,
     set_Q();
     set_V();
     set_N();
+    set_state_1D();
 
     if(alpha < 0.0 || alpha > 1.0)
     {
@@ -186,6 +187,7 @@ LearningAlgorithm::LearningAlgorithm(Robot* pointer_robot_primary,
     set_A(actions);
     set_Q();
     set_V();
+    set_state_1D();
 
     if(alpha < 0.0 || alpha > 1.0)
     {
@@ -482,6 +484,24 @@ void LearningAlgorithm::set_N(void)
 }
 
 
+void LearningAlgorithm::set_state_1D(void)
+{
+    for(double s=state_space_min; s<=state_space_max; )
+    {
+        state_1D.push_back(s);
+        s = s + state_space_resolution;
+    }
+
+    cout << endl << "1D_state_space.size(): " << state_1D.size() << endl;
+
+    cout << "1D State Space" << endl;
+    for(unsigned int s=0; s<state_1D.size(); s++)
+    {
+        cout << state_1D[s] << endl;
+    }
+}
+
+
 void LearningAlgorithm::initialise_Q(const double init_val)
 {
     if(_Q.empty())
@@ -527,6 +547,29 @@ void LearningAlgorithm::initialise_V(const double init_val)
         _V[s] = init_val;
 
     }
+}
+
+
+unsigned int LearningAlgorithm::get_action_size(void) const
+{
+    return _A.size();
+}
+
+
+void LearningAlgorithm::set_epsilon(const double epsilon)
+{
+    if(epsilon >=0 && epsilon <= 1.0)
+    {
+        _epsilon = epsilon;
+    }
+    else
+    {
+        cerr << "LearningLocomotion Error: LearningAlgorithm class." << endl
+             << "void set_epsilon(const double method" << std::endl
+             << "espilon: " << epsilon << " out of range. Should be in the range [0,1]." << endl;
+        exit(1);
+    }
+
 }
 
 
@@ -660,21 +703,14 @@ bool LearningAlgorithm::valid_action(const unsigned int s, const unsigned int a)
 vector<double> LearningAlgorithm::roundoff_to_closest_state(const vector<double> servo_pos) const
 {
     vector<double> sp;
-    vector<double> state_1D;
-    
-    for(double s=state_space_min; s<=state_space_max; )
-    {
-        state_1D.push_back(s);
-        s = s + state_space_resolution;
-    }
-    
-    //cout << endl << "state_1D.size(): " << state_1D.size() << endl;
-    
-    double delta = fabs(state_space_min - state_space_max);
+
+    double delta;
     unsigned int indx = 0;
     
     for(unsigned int m=0; m<servo_pos.size(); m++)
     {
+        delta = fabs(state_space_min - state_space_max);
+        indx = 0;
         for(unsigned int i=0; i<state_1D.size(); i++)
         {
             if(fabs(servo_pos[m] - state_1D[i]) < delta)
@@ -691,6 +727,7 @@ vector<double> LearningAlgorithm::roundoff_to_closest_state(const vector<double>
 
 
 //--Given a state s and action a, calculate the expected next state s'--//
+//--Returns the index of the expected next state s', in state-space S--//
 unsigned int LearningAlgorithm::expected_next_state(const unsigned int s, const unsigned int a) const
 {
     if(_S.empty())
@@ -1081,9 +1118,28 @@ double LearningAlgorithm::act(const unsigned int s, const unsigned int a, unsign
 
     unsigned int expected_sp = 0;
     
+    unsigned long current_time = 0;
     double dt = 0;
     unsigned int cycles = 0;
-    
+
+#ifdef RECORD_SERVO
+    double t = 0;
+
+    //--Reference Graph--//
+    fstream ref_graph;
+    ref_graph.open("ref.dat",ios::out | ios::app);
+
+    //--Servo Graph--//
+    fstream servo_graph;
+    servo_graph.open("servo.dat",ios::out | ios::app);
+#endif
+
+    //--Save current joint angles--//
+    for(unsigned int module=0; module<number_of_modules; module++)
+    {
+        previous_joint_angle[module] = servo_feedback[module]->get_servo_position();
+    }
+
     //--Take action A--//
     vector<double> output;
     for(unsigned int module=0; module<number_of_modules; module++)
@@ -1098,6 +1154,8 @@ double LearningAlgorithm::act(const unsigned int s, const unsigned int a, unsign
     {
         //--TODO: Simulate one step--//
         robot_primary->step("learn");
+
+        current_time = robot_primary->get_elapsed_evaluation_time();
         
         //--Observe S'--//
         for(unsigned int module=0; module<number_of_modules; module++)
@@ -1105,8 +1163,44 @@ double LearningAlgorithm::act(const unsigned int s, const unsigned int a, unsign
             servo_positions[module] = servo_feedback[module]->get_servo_position();
         }
         sp = get_state_indx(roundoff_to_closest_state(servo_positions));
-        
-        dt = (robot_primary->get_elapsed_evaluation_time() - robot_primary->get_previous_velocity_time()) / 1000000.0;
+
+#ifdef RECORD_SERVO
+        t = current_time / 1000000.0;
+
+        ref_graph << t;
+        servo_graph << t;
+
+        for(unsigned int module=0; module<number_of_modules; module++)
+        {
+            ref_graph << " " << output[module];
+            servo_graph << " " << servo_positions[module];
+        }
+
+        for(unsigned int module=0; module<number_of_modules; module++)
+        {
+            ref_graph << " " << _S[s][module];
+        }
+
+        for(unsigned int module=0; module<number_of_modules; module++)
+        {
+            ref_graph << " " << _A[a][module];
+        }
+
+        for(unsigned int module=0; module<number_of_modules; module++)
+        {
+            ref_graph << " " << _S[expected_sp][module];
+        }
+
+        for(unsigned int module=0; module<number_of_modules; module++)
+        {
+            ref_graph << " " << _S[sp][module];
+        }
+
+        ref_graph << endl;
+        servo_graph << endl;
+#endif
+
+        dt = (current_time - robot_primary->get_previous_velocity_time()) / 1000000.0;
         cycles++;
         
         //}while(sp == s && a != zero_a && dt < CUTOFF_TIME);
@@ -1121,22 +1215,25 @@ double LearningAlgorithm::act(const unsigned int s, const unsigned int a, unsign
     if(dt >= CUTOFF_TIME)
     {
         r = r + WRONG_STATE_PENALTY;
+    }
 
-        if(sp == s)
-        {
-            r = r + USELESS_ACTION_PENALTY;
+    if(sp == s)
+    {
+        r = r + USELESS_ACTION_PENALTY;
 
-            //char keyboard_key;
-            cout << endl << "Elapsed Time: " << robot_primary->get_elapsed_evaluation_time()
-                 << "   Previous Time: " << robot_primary->get_previous_velocity_time()
-                 << "   Delta Time: " << dt
-                 << "    Cycles: " << cycles << endl;
-            //cout << "Press a key to continue" << endl;
-        }
+        cout << endl << "Elapsed Time: " << robot_primary->get_elapsed_evaluation_time()
+             << "   Previous Time: " << robot_primary->get_previous_velocity_time()
+             << "   Delta Time: " << dt
+             << "    Cycles: " << cycles << endl;
     }
     
     cout << endl << "   Delta Time: " << dt
          << "    Cycles: " << cycles;
+
+#ifdef RECORD_SERVO
+    ref_graph.close();
+    servo_graph.close();
+#endif
     
     return(r);
 }
@@ -2199,9 +2296,9 @@ void LearningAlgorithm::create_training_dataFile(void) const
 
                 //--X_1, X_2, X_3, X_4--//
                 training_file_Reg << feat(0) << " "
-                              << feat(1) << " "
-                              << feat(2) << " "
-                              << feat(3) << " ";
+                                  << feat(1) << " "
+                                  << feat(2) << " "
+                                  << feat(3) << " ";
 
                 for(unsigned int k=1; k<=degrees; k++)
                 {

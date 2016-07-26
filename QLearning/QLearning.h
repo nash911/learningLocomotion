@@ -43,6 +43,7 @@ public:
                             Flood::Vector<double>&,
                             Flood::Vector<bool>&);*/
 
+    unsigned int choose_action_greedy(const unsigned int) const;
     unsigned int choose_action_epsilon_greedy(const unsigned int, const double) const;
     unsigned int choose_action_epsilon_soft(const unsigned int, const double) const;
     double get_Q_max_a(const unsigned int) const;
@@ -53,6 +54,8 @@ public:
     virtual void init_controller(const double);
     virtual void start_learning(const string);
     virtual void learn(const string);
+    virtual void start_evaluation();
+    virtual void evaluate(const double);
 };
 
 #endif

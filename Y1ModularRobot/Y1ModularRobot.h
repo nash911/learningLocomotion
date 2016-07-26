@@ -112,6 +112,7 @@ public:
   double calculate_velocity_Y(void);
   void measure_cumulative_distance(void);
   double get_vx(void);
+  double get_vy(void);
   void get_robot_rotation(vector<double>&);
   double get_robot_X(void);
   double get_robot_Y(void);

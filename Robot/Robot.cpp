@@ -21,7 +21,9 @@ Robot::Robot()
   set_robot_priority("Robot_Primary");
   elapsed_evaluation_time = 0;
   previous_velocity_time = 0;
-  distance_travelled = 0;
+  distance_travelled = 0.0;
+  distance_travelled_cumulative_x = 0.0;
+  distance_travelled_cumulative_y = 0.0;
   evaluation_method = Euclidean_Distance_Final;
   number_of_modules = 2;
 
@@ -373,6 +375,30 @@ double Robot::get_distance_travelled(void)
               << "Unknown Evaluation Method: " << evaluation_method << std::endl;
     exit(1);
   }
+}
+
+
+double Robot::get_cumulative_distance_travelled_x(void)
+{
+    return distance_travelled_cumulative_x;
+}
+
+
+double Robot::get_cumulative_distance_travelled_y(void)
+{
+    return distance_travelled_cumulative_y;
+}
+
+
+void Robot::reset_cumulative_distance_travelled_x(void)
+{
+    distance_travelled_cumulative_x = 0.0;
+}
+
+
+void Robot::reset_cumulative_distance_travelled_y(void)
+{
+    distance_travelled_cumulative_y = 0.0;
 }
 
 

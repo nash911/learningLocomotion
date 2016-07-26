@@ -2226,6 +2226,12 @@ double Y1ModularRobot::get_vx(void)
 }
 
 
+double Y1ModularRobot::get_vy(void)
+{
+    //--Need to be completed
+    return 0;
+}
+
 void Y1ModularRobot::get_robot_rotation(vector<double>& rot)
 {
     //--Need to be completed

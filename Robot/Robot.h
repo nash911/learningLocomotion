@@ -65,6 +65,10 @@ public:
   unsigned int get_number_of_modules(void) const;
   unsigned long get_initial_evaluation_time(void);
   double get_distance_travelled(void);
+  double get_cumulative_distance_travelled_x(void);
+  double get_cumulative_distance_travelled_y(void);
+  void reset_cumulative_distance_travelled_x(void);
+  void reset_cumulative_distance_travelled_y(void);
   void set_receive_broadcast(bool);
   bool get_receive_broadcast();
   void set_broadcast_thread(bool);
@@ -98,6 +102,7 @@ public:
   virtual double calculate_velocity_Y(void) = 0;
   virtual void measure_cumulative_distance(void) = 0;
   virtual double get_vx(void) = 0;
+  virtual double get_vy(void) = 0;
   virtual void get_robot_rotation(vector<double>&) = 0;
   virtual double get_robot_X(void) = 0;
   virtual double get_robot_Y(void) = 0;
@@ -124,6 +129,8 @@ protected:
   unsigned long previous_read_evaluation_time;
   unsigned long elapsed_evaluation_time; //--microseconds
   double distance_travelled;
+  double distance_travelled_cumulative_x;
+  double distance_travelled_cumulative_y;
   unsigned long previous_velocity_time;
 
   bool receive_broadcast;

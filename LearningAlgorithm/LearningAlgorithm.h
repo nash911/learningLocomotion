@@ -56,20 +56,29 @@
 #define EPSILON 0.1
 #define LAMDA 0.9
 
-#define Q_INIT_VAL 5.0
+#define Q_INIT_VAL 0.5
 #define V_INIT_VAL 0.0
 #define STEP_LIMIT 25000
 #define CUTOFF_TIME 2.0
+#define LEARNING_PERIOD 20000 //--Steps--//
 
-#define INVALID_ACTION_PENALTY -10.0
+//#define EVALUATE
+#define EVALUATION_INTERVAL 100000 //--Steps--//
+#define EVALUATION_PERIOD 1000 //--Seconds--//
+//#define RECORD_SERVO
+
+#define INVALID_ACTION_PENALTY -10000.0
 #define IDLE_PENALTY 0 //-0.1
-#define USELESS_ACTION_PENALTY 0 //-20.0
-#define WRONG_STATE_PENALTY 0 //-0.2
-#define EXIT_STATE_PENALTY -1.0
+#define USELESS_ACTION_PENALTY -0.2 //--If (S_t, A_t) --> (S_(t+1) = S_t)--//
+#define WRONG_STATE_PENALTY 0.0 //--If (S_t, A_t) --> (S_(t+1) = S'), but S' ≠ S_(t+1)--//
+#define EXIT_STATE_PENALTY -5.0
+#define DISTANCE_GOAL 1.0 //--Meters--//
+#define DISTANCE_REWARD 200.0 //--R/Travel_time--//
+#define BOUNDRY 3.0 //--Meters--//
 
 #define R_ALPHA 0.1
 
-#define EXPLORE_FUNCTION
+//#define EXPLORE_FUNCTION
 
 using namespace std;
 
@@ -128,6 +137,8 @@ public:
     virtual void init_controller(const double);
     virtual void start_learning(const string) = 0;
     virtual void learn(const string) = 0;
+    virtual void start_evaluation() = 0;
+    virtual void evaluate(const double) = 0;
 
     //--Learning Functions--//
     void set_S(void);
@@ -135,8 +146,12 @@ public:
     void set_Q(void);
     void set_V(void);
     void set_N(void);
+    void set_state_1D(void);
     void initialise_Q(const double);
     void initialise_V(const double);
+
+    unsigned int get_action_size(void) const;
+    void set_epsilon(const double);
 
     unsigned int get_state_indx(const vector<double>) const; //--Search and return the index of a state in the state vector _S--//
     bool valid_action(const unsigned int, const unsigned int) const; //--Simulate an action a and check if the action a in the current state s leads to a valide next state s'--//
@@ -183,6 +198,10 @@ public:
 
     void init_steps(char*);
 
+    template <typename T> int sgn(T val) {
+          return (T(0) < val) - (val < T(0));
+      }
+
 protected:
     Robot *robot_primary;
     Robot *robot_secondary;
@@ -207,6 +226,9 @@ protected:
     double state_space_min;
     double state_space_max;
     double state_space_resolution;
+
+    vector<double> state_1D;
+    vector<double> previous_joint_angle;
 
     double _alpha;
     double _gama;
